@@ -57,7 +57,7 @@ By integrating cell-type annotation, gene expression across **19,429 filtered ge
     ```bash
     python app_final.py
     ```
-    Access the explorer at `http://localhost:5050` or the designated **[server url]([https://sites.bu.edu/tcwlab/](https://bioed-new.bu.edu/students_26/Team14/website/app)**.
+    Access the explorer at `http://localhost:5050` or the designated **[server url](https://bioed-new.bu.edu/students_26/Team14/website/app)**.
 
 ## Notes about the Website
 * **Interactivity:** All plots are interactive. Hovering over data points displays specific values. Clicking or double-clicking legend items allows you to toggle specific groups on or off.
