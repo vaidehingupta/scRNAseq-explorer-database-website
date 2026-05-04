@@ -2,7 +2,7 @@
 
 Developed by **Team 14** in collaboration with the **[TCW Laboratory](https://sites.bu.edu/tcwlab/)** at Boston University (BF768).
 
-## 👥 Team 14 Members
+## Team 14 Members
 * Wendy Bui
 * Chloe Ploss
 * Vaidehi Gupta
