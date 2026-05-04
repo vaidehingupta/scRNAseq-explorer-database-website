@@ -1,0 +1,1531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TCW scRNA-seq Explorer</title>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background: white;font-size:13px;color:#1a1a2e;display:flex;flex-direction:column;min-height:100vh}
+header{background:linear-gradient(135deg,#0a1540 0%,#1a3480 60%,#1e4db7 100%);color:#fff;padding:0 24px;display:flex;align-items:center;gap:16px;height:62px;flex-shrink:0;box-shadow:0 2px 10px rgba(0,0,0,0.4)}
+.logo-img{height:46px;width:auto;object-fit:contain;flex-shrink:0;border-radius:3px}
+.logo-fallback{display:none;background:rgba(255,255,255,0.12);border:1.5px solid rgba(255,255,255,0.3);border-radius:4px;padding:5px 9px;font-size:13px;font-weight:700;text-align:center;line-height:1.3}
+.logo-divider{width:1px;height:34px;background:rgba(255,255,255,0.28);flex-shrink:0}
+.header-titles{display:flex;flex-direction:column;gap:1px}
+header h1{font-size:18px;font-weight:700;letter-spacing:0.2px}
+header .tagline{font-size:11px;opacity:0.6}
+.header-right{margin-left:auto;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);border-radius:4px;padding:5px 14px;font-size:11px;font-weight:600;letter-spacing:1px}
+.tab-bar{background:#0d1b4b;display:flex;padding:0 20px;gap:2px;flex-shrink:0;border-bottom:2px solid #0a1540}
+.tab-btn{background:transparent;border:none;border-bottom:3px solid transparent;color:rgba(255,255,255,0.48);padding:10px 22px;font-size:13px;font-weight:500;cursor:pointer;transition:color .15s,border-color .15s;margin-bottom:-2px}
+.tab-btn.active{color:#fff;border-bottom-color:#5b9bd5;font-weight:600}
+.tab-btn:hover:not(.active){color:rgba(255,255,255,0.82)}
+.tab-panel{display:none;flex:1;overflow:hidden}
+.tab-panel.active{display:flex;flex-direction:column}
+.tab-content{display:flex;flex:1;overflow:hidden}
+.sidebar{width:234px;min-width:234px;background:#fff;border-right:1px solid #d4daea;padding:14px 13px;overflow-y:auto;display:flex;flex-direction:column}
+.section-title{font-size:10px;font-weight:700;color:#5b6e9e;text-transform:uppercase;letter-spacing:0.9px;padding-bottom:5px;margin-bottom:8px;border-bottom:1px solid #e4eaf5}
+.sidebar-section{margin-bottom:16px}
+.ctrl-label{display:block;font-size:11.5px;font-weight:600;color:#2c3a5e;margin-bottom:4px;margin-top:10px}
+.ctrl-label:first-child{margin-top:0}
+select,input[type="number"]{width:100%;padding:5px 28px 5px 8px;border:1px solid #c2cce0;border-radius:4px;font-size:12px;background:#fafbfd;color:#1a1a2e;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235b6e9e'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;cursor:pointer}
+input[type="number"]{background-image:none;padding-right:8px}
+select:focus,input[type="number"]:focus{outline:2px solid #1e4db7;border-color:#1e4db7}
+.radio-group{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.radio-group label{display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer;color:#2c3a5e}
+.radio-group input[type="radio"]{accent-color:#1a3480}
+
+/* Genotype checkbox group */
+.geno-cb-group{display:flex;flex-direction:column;gap:5px;margin-top:4px}
+.geno-cb-group label{display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer;color:#2c3a5e}
+.geno-cb-group input[type="checkbox"]{accent-color:#1a3480;flex-shrink:0}
+
+/* Gene autocomplete */
+.gene-ac-wrap{position:relative;margin-top:4px}
+.gene-ac-input{width:100%;padding:5px 8px;border:1px solid #c2cce0;border-radius:4px;font-size:12px;background:#fafbfd;color:#1a1a2e;outline:none}
+.gene-ac-input:focus{border-color:#1e4db7;outline:2px solid #1e4db7}
+.gene-ac-drop{display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;background:#fff;border:1px solid #c2cce0;border-radius:4px;box-shadow:0 4px 14px rgba(0,0,0,0.12);z-index:300;max-height:200px;overflow-y:auto}
+.gene-ac-item{padding:5px 10px;font-size:12px;color:#2c3a5e;cursor:pointer}
+.gene-ac-item:hover{background:#eef2fc}
+
+/* Gene tags (multigene) */
+.gene-tags-wrap{margin-top:6px}
+.gene-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;min-height:24px}
+.gene-tag{display:inline-flex;align-items:center;gap:4px;background:#e8edf8;border:1px solid #c2cce0;border-radius:12px;padding:2px 8px;font-size:11px;color:#1a3480;font-weight:600}
+.gene-tag button{background:none;border:none;cursor:pointer;color:#8898bb;font-size:13px;line-height:1;padding:0}
+.gene-tag button:hover{color:#e15759}
+
+/* Multiselect */
+.ms-wrap{position:relative;margin-top:4px}
+.ms-trigger{width:100%;border:1px solid #c2cce0;border-radius:4px;background:#fafbfd;padding:5px 8px;font-size:12px;color:#1a1a2e;cursor:pointer;display:flex;justify-content:space-between;align-items:center;min-height:30px;text-align:left}
+.ms-trigger:hover{border-color:#1e4db7}
+.ms-trigger-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ms-arrow{font-size:9px;color:#5b6e9e;margin-left:6px;flex-shrink:0}
+.ms-panel{display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;background:#fff;border:1px solid #c2cce0;border-radius:4px;box-shadow:0 4px 14px rgba(0,0,0,0.12);z-index:200;flex-direction:column;max-height:220px}
+.ms-panel.open{display:flex}
+.ms-search{padding:6px 9px;border:none;border-bottom:1px solid #e4eaf5;font-size:12px;color:#1a1a2e;outline:none;background:#f7f9fd;flex-shrink:0}
+.ms-list{overflow-y:auto;flex:1;padding:4px 0}
+.ms-list label{display:flex;align-items:center;gap:7px;padding:4px 10px;font-size:12px;cursor:pointer;color:#2c3a5e}
+.ms-list label:hover{background:#eef2fc}
+.ms-list input[type="checkbox"]{accent-color:#1a3480;flex-shrink:0}
+.btn-run{width:100%;margin-top:16px;padding:9px;background:linear-gradient(135deg,#1a3480,#1e4db7);color:#fff;border:none;border-radius:4px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:0.3px;box-shadow:0 2px 6px rgba(26,52,128,0.3);transition:opacity .15s}
+.btn-run:hover{opacity:0.88}
+.btn-run:active{opacity:0.72;transform:translateY(1px)}
+.spinner{display:none;border:3px solid #dde4f0;border-top-color:#1a3480;border-radius:50%;width:20px;height:20px;animation:spin .65s linear infinite;margin:10px auto 0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err-box{display:none;background:#fff2f2;border:1px solid #f5c6c6;border-radius:4px;padding:8px 10px;font-size:11px;color:#a00;margin-top:10px;word-break:break-word;line-height:1.5}
+
+/* Plot area */
+.plot-area{flex:1;padding:10px;overflow:hidden;display:flex;flex-direction:column;gap:8px;min-width:0}
+
+/* UMAP column-based grid */
+.umap-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;flex:1;min-height:0}
+.umap-col{display:flex;flex-direction:column;gap:8px;min-width:0;min-height:0}
+.umap-col .plot-card{flex:1;min-height:0}
+.plot-card{background:#fff;border:1px solid #d4daea;border-radius:6px;display:flex;flex-direction:column;overflow:visible;min-width:0;min-height:0;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.plot-card-header{display:flex;align-items:baseline;justify-content:space-between;padding:5px 10px;border-bottom:1px solid #e8edf5;background:#ffffff;flex-shrink:0}
+.plot-card-title{font-size:11px;font-weight:700;color:#1a3480;letter-spacing:0.1px}
+.plot-card-sub{font-size:10px;color:#8898bb;margin-left:5px}
+.plot-div{flex:1;min-height:0}
+
+/* Composition dynamic grid */
+.comp-grid{display:grid;gap:8px;flex:1;min-height:0}
+.comp-grid.cols-1{grid-template-columns:1fr}
+.comp-grid.cols-2{grid-template-columns:1fr 1fr}
+.comp-grid.cols-3{grid-template-columns:1fr 1fr 1fr}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:#1a3480;color:#fff;padding:8px 12px;text-align:left;font-weight:600;font-size:11px;letter-spacing:0.3px;position:sticky;top:0;z-index:1}
+tbody tr{border-bottom:1px solid #eceef5}
+tbody tr:nth-child(even){background:#f7f9fd}
+tbody tr:hover{background:#eef2fc}
+tbody td{padding:6px 12px;color:#2c3a5e}
+.expr-high{color:#0d3574;font-weight:600}
+.expr-zero{color:#aab0c4}
+#btn-download-csv:disabled,#btn-download-cp:disabled{opacity:0.4;cursor:not-allowed}
+
+.status-bar{background:#e6ecf7;border-top:1px solid #c5d0e8;padding:4px 18px;font-size:11px;color:#4a5e8a;flex-shrink:0;min-height:22px}
+
+/* About tab */
+#tab-explanation{overflow-y:auto}
+#tab-explanation .tab-content{display:block;overflow-y:auto;height:100%}
+.about-body{width:100%;max-width:1200px;margin:0 auto;padding:24px 40px 40px;line-height:1.8;color:#2c3a5e;font-size:14px;}
+.about-card{background:#fff;border:1px solid #d4daea;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.06);padding:28px 40px 36px}
+.about-card-header{display:flex;align-items:baseline;justify-content:space-between;padding-bottom:14px;margin-bottom:20px;border-bottom:1px solid #e8edf5}
+.about-card-title{font-size:22px;font-weight:700;color:#1a3480}
+.about-card-sub{font-size:12px;color:#8898bb}
+.about-body h2{color:#1a3480;font-size:18px;margin-top:28px;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid #e4eaf5}
+.about-body h2:first-child{margin-top:0}
+.about-body p{margin-bottom:10px}
+.about-body ul{margin:6px 0 12px 22px;display:flex;flex-direction:column;gap:6px}
+.about-body ul li{line-height:1.65}
+.about-body strong{color:#1a3480}
+.about-body a{color:#1a3480;font-weight:600}
+.members-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-top:12px}
+.member-card{background:#f7f9fd;border:1px solid #d4daea;border-radius:6px;padding:12px 16px;font-size:13px;color:#2c3a5e;font-weight:600}
+</style>
+</head>
+<body>
+<header>
+  <a href="https://sites.bu.edu/tcwlab/" target="_blank">
+    <img class="logo-img" src="https://sites.bu.edu/tcwlab/files/2022/02/TCW-laboratory-logo_1-2-636x468.jpg" alt="TCW Laboratory"
+         onerror="this.style.display='none';document.getElementById('logo-fb').style.display='flex'">
+  </a>
+  <a href="https://sites.bu.edu/tcwlab/" target="_blank" id="logo-fb" class="logo-fallback">TCW<br>LAB<br><span style="font-size:8px;font-weight:400;opacity:0.7;">"SCIENCE IS A TEAM SPORT"</span></a>
+  <div class="logo-divider"></div>
+  <div class="header-titles"><h1>scRNA-seq Explorer</h1><div class="tagline">TCW Laboratory &nbsp;·&nbsp; Team 14 &nbsp;·&nbsp; BF768</div></div>
+  <div class="header-right" style="display: flex; gap: 10px; align-items: center;">
+    <button onclick="showTab('explanation', document.querySelector('.tab-btn'))"
+            style="background: rgba(255,255,255,0.2); border: 1px solid white; color: white; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 10px;">
+      HOME
+    </button>
+    <span>SCRNA-SEQ PLATFORM</span>
+  </div>
+</header>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="showTab('explanation',this)">Home</button>
+  <button class="tab-btn" onclick="showTab('umap',this)">Single-cell Expression</button>
+  <button class="tab-btn" onclick="showTab('multigene',this)">Multi-Gene Expression</button>
+  <button class="tab-btn" onclick="showTab('composition',this)">Cell Type Composition</button>
+  <button class="tab-btn" onclick="showTab('summary',this)">Data Tables</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     TAB 1: SINGLE-CELL EXPRESSION (UMAP)
+     ═══════════════════════════════════════════════════════ -->
+<div id="tab-umap" class="tab-panel">
+  <div class="tab-content">
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="section-title">Gene</div>
+        <div class="gene-ac-wrap">
+          <input class="gene-ac-input" id="umap_gene_input" placeholder="Search gene (e.g. APOE)…" autocomplete="off">
+          <div class="gene-ac-drop" id="umap_gene_drop"></div>
+          <input type="hidden" id="umap_gene_val" value="APOE">
+        </div>
+        <p style="font-size:10.5px;color:#8898bb;margin-top:6px;line-height:1.4;">Type to search all genes. Press Enter or click to add.</p>
+      </div>
+      <div class="sidebar-section">
+        <div class="section-title">Filters</div>
+        <span class="ctrl-label">APOE Genotype</span>
+        <div class="ms-wrap" id="ms-mg-geno">
+          <button type="button" class="ms-trigger" onclick="msToggle('ms-mg-geno')">
+            <span class="ms-trigger-text" id="ms-mg-geno-lbl">All selected</span><span class="ms-arrow">&#9660;</span>
+          </button>
+          <div class="ms-panel" id="ms-mg-geno-panel">
+            <div class="ms-list" id="ms-mg-geno-list">
+              <label><input type="checkbox" value="All" checked onchange="updateGenoCols();"> All (merged)</label>
+              <label><input type="checkbox" value="APOE 33" checked onchange="updateGenoCols();"> APOE 33</label>
+              <label><input type="checkbox" value="APOE 44" checked onchange="updateGenoCols();"> APOE 44</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <span class="ctrl-label">Cell Type</span>
+        <div class="ms-wrap" id="ms-umap-ct">
+          <button type="button" class="ms-trigger" onclick="msToggle('ms-umap-ct')">
+            <span class="ms-trigger-text" id="ms-umap-ct-lbl">All selected</span><span class="ms-arrow">&#9660;</span>
+          </button>
+          <div class="ms-panel" id="ms-umap-ct-panel">
+            <input class="ms-search" placeholder="Search…" oninput="msFilter('ms-umap-ct',this.value)">
+            <div class="ms-list" id="ms-umap-ct-list">
+              <label><input type="checkbox" value="All" checked onchange="msAllToggle('ms-umap-ct',this)"> All</label>
+              {% for ct in cell_types %}<label><input type="checkbox" value="{{ ct }}" checked onchange="msItemChange('ms-umap-ct')"> {{ ct }}</label>{% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="sidebar-section">
+          <span class="ctrl-label">Sample</span>
+          <div class="ms-wrap" id="ms-umap-samp">
+            <button type="button" class="ms-trigger" onclick="msToggle('ms-umap-samp')">
+              <span class="ms-trigger-text" id="ms-umap-samp-lbl">All Samples</span><span class="ms-arrow">&#9660;</span>
+            </button>
+            <div class="ms-panel" id="ms-umap-samp-panel">
+              <div class="ms-list" id="ms-umap-samp-list">
+                <label><input type="checkbox" value="All" checked onchange="msAllToggle('ms-umap-samp',this)"> All</label>
+                {% for s in samples %}<label><input type="checkbox" value="{{ s }}" checked onchange="msItemChange('ms-umap-samp')"> {{ s }}</label>{% endfor %}
+              </div>
+            </div>
+          </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="section-title">Bottom Panels — Display As</div>
+        <div class="radio-group">
+          <label><input type="radio" name="right_panel" value="umap" checked onchange="onRightPanelChange()"> Gene Expression UMAP</label>
+          <label><input type="radio" name="right_panel" value="violin" onchange="onRightPanelChange()"> Violin (by Genotype)</label>
+          <label><input type="radio" name="right_panel" value="dot" onchange="onRightPanelChange()"> Dot Plot</label>
+          <label><input type="radio" name="right_panel" value="scatter" onchange="onRightPanelChange()"> Scatter Plot</label>
+        </div>
+      </div>
+      <div class="spinner" id="umap-spinner"></div>
+      <div class="err-box" id="err-box"></div>
+      <button class="btn-run" onclick="runUMAP()">&#9654; Plot</button>
+    </div>
+    <div class="plot-area">
+      <div class="umap-grid" id="umap-grid">
+        <!-- Column: All (merged) -->
+        <div class="umap-col" id="umap-col-all">
+          <div class="plot-card">
+            <div class="plot-card-header"><span class="plot-card-title">Cell Type — All</span></div>
+            <div class="plot-div" id="plot-ct-all"></div>
+          </div>
+          <div class="plot-card" id="expr-card-all" style="display:flex;flex-direction:column;">
+            <div class="plot-card-header"><span class="plot-card-title" id="expr-all-title">Gene Expr — All</span></div>
+            <div class="plot-div" id="plot-expr-all"></div>
+          </div>
+          <div class="plot-card" id="alt-card-all" style="display:none;flex-direction:column;">
+            <div class="plot-card-header"><span class="plot-card-title" id="alt-title">Plot — All</span><span class="plot-card-sub" id="alt-sub"></span></div>
+            <div class="plot-div" id="plot-alt-all"></div>
+          </div>
+        </div>
+        <!-- Column: APOE 33 -->
+        <div class="umap-col" id="umap-col-33">
+          <div class="plot-card">
+            <div class="plot-card-header"><span class="plot-card-title">Cell Type — APOE 33</span></div>
+            <div class="plot-div" id="plot-ct-33"></div>
+          </div>
+          <div class="plot-card" id="expr-card-33" style="display:flex;flex-direction:column;">
+            <div class="plot-card-header"><span class="plot-card-title">Gene Expr — APOE 33</span></div>
+            <div class="plot-div" id="plot-expr-33"></div>
+          </div>
+          <div class="plot-card" id="alt-card-33" style="display:none;flex-direction:column;">
+            <div class="plot-card-header"><span class="plot-card-title" id="alt-title-33">Plot — APOE 33</span></div>
+            <div class="plot-div" id="plot-alt-33"></div>
+          </div>
+        </div>
+        <!-- Column: APOE 44 -->
+        <div class="umap-col" id="umap-col-44">
+          <div class="plot-card">
+            <div class="plot-card-header"><span class="plot-card-title">Cell Type — APOE 44</span></div>
+            <div class="plot-div" id="plot-ct-44"></div>
+          </div>
+          <div class="plot-card" id="expr-card-44" style="display:flex;flex-direction:column;">
+            <div class="plot-card-header"><span class="plot-card-title">Gene Expr — APOE 44</span></div>
+            <div class="plot-div" id="plot-expr-44"></div>
+          </div>
+          <div class="plot-card" id="alt-card-44" style="display:none;flex-direction:column;">
+            <div class="plot-card-header"><span class="plot-card-title" id="alt-title-44">Plot — APOE 44</span></div>
+            <div class="plot-div" id="plot-alt-44"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     TAB 2: MULTI-GENE EXPRESSION
+     ═══════════════════════════════════════════════════════ -->
+<div id="tab-multigene" class="tab-panel">
+  <div class="tab-content">
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="section-title">Genes (max 10)</div>
+        <div class="gene-tags-wrap">
+          <div id="mg-gene-tags" class="gene-tags"></div>
+          <div class="gene-ac-wrap">
+            <input class="gene-ac-input" id="mg_gene_input" placeholder="Add gene…" autocomplete="off">
+            <div class="gene-ac-drop" id="mg_gene_drop"></div>
+          </div>
+        </div>
+        <p style="font-size:10.5px;color:#8898bb;margin-top:6px;line-height:1.4;">Type to search all genes. Press Enter or click to add.</p>
+      </div>
+      <div class="sidebar-section">
+        <div class="section-title">Filters</div>
+        <span class="ctrl-label">APOE Genotype</span>
+        <div class="ms-wrap" id="ms-mg-geno2">
+          <button type="button" class="ms-trigger" onclick="msToggle('ms-mg-geno2')">
+            <span class="ms-trigger-text" id="ms-mg-geno2-lbl">All selected</span><span class="ms-arrow">&#9660;</span>
+          </button>
+          <div class="ms-panel" id="ms-mg-geno2-panel">
+            <div class="ms-list" id="ms-mg-geno2-list">
+              <label><input type="checkbox" value="All" checked onchange="msAllToggle('ms-mg-geno2',this)"> All (merged)</label>
+              <label><input type="checkbox" value="APOE 33" checked onchange="msItemChange('ms-mg-geno2')"> APOE 33</label>
+              <label><input type="checkbox" value="APOE 44" checked onchange="msItemChange('ms-mg-geno2')"> APOE 44</label>
+            </div>
+          </div>
+        </div>
+        <span class="ctrl-label">Cell Type</span>
+        <div class="ms-wrap" id="ms-mg-ct">
+          <button type="button" class="ms-trigger" onclick="msToggle('ms-mg-ct')">
+            <span class="ms-trigger-text" id="ms-mg-ct-lbl">All selected</span><span class="ms-arrow">&#9660;</span>
+          </button>
+          <div class="ms-panel" id="ms-mg-ct-panel">
+            <input class="ms-search" placeholder="Search…" oninput="msFilter('ms-mg-ct',this.value)">
+            <div class="ms-list" id="ms-mg-ct-list">
+              <label><input type="checkbox" value="All" checked onchange="msAllToggle('ms-mg-ct',this)"> All</label>
+              {% for ct in cell_types %}<label><input type="checkbox" value="{{ ct }}" checked onchange="msItemChange('ms-mg-ct')"> {{ ct }}</label>{% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="section-title">Plot Type</div>
+        <div class="radio-group">
+          <label><input type="radio" name="mg_plot_type" value="dot" checked> Dot Plot</label>
+          <label><input type="radio" name="mg_plot_type" value="heatmap"> Heatmap</label>
+        </div>
+      </div>
+      <div class="spinner" id="mg-spinner"></div>
+      <div class="err-box" id="mg-err"></div>
+      <button class="btn-run" onclick="runMultigene()">&#9654; Plot</button>
+    </div>
+    <div class="plot-area">
+      <div class="plot-card" style="flex:1;min-height:0">
+        <div class="plot-card-header">
+          <span class="plot-card-title" id="mg-title">Multi-Gene Expression</span>
+          <span class="plot-card-sub" id="mg-sub"></span>
+        </div>
+        <div class="plot-div" id="plot-multigene" style="min-height:500px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     TAB 3: CELL TYPE COMPOSITION
+     ═══════════════════════════════════════════════════════ -->
+<div id="tab-composition" class="tab-panel">
+  <div class="tab-content">
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="section-title">Filters</div>
+        <span class="ctrl-label">APOE Genotype</span>
+        <div class="ms-wrap" id="ms-comp-geno">
+          <button type="button" class="ms-trigger" onclick="msToggle('ms-comp-geno')">
+            <span class="ms-trigger-text" id="ms-comp-geno-lbl">All selected</span><span class="ms-arrow">&#9660;</span>
+          </button>
+          <div class="ms-panel" id="ms-comp-geno-panel">
+            <div class="ms-list" id="ms-comp-geno-list">
+              <label><input type="checkbox" value="All" checked onchange="compGenoAllToggle(this)"> All (merged)</label>
+              <label><input type="checkbox" value="APOE 33" checked onchange="compGenoItemChange()"> APOE 33</label>
+              <label><input type="checkbox" value="APOE 44" checked onchange="compGenoItemChange()"> APOE 44</label>
+            </div>
+          </div>
+        </div>
+        <span class="ctrl-label">Cell Type</span>
+        <div class="ms-wrap" id="ms-comp-ct">
+          <button type="button" class="ms-trigger" onclick="msToggle('ms-comp-ct')">
+            <span class="ms-trigger-text" id="ms-comp-ct-lbl">All selected</span><span class="ms-arrow">&#9660;</span>
+          </button>
+          <div class="ms-panel" id="ms-comp-ct-panel">
+            <input class="ms-search" placeholder="Search…" oninput="msFilter('ms-comp-ct',this.value)">
+            <div class="ms-list" id="ms-comp-ct-list">
+              <label><input type="checkbox" value="All" checked onchange="msAllToggle('ms-comp-ct',this)"> All</label>
+              {% for ct in cell_types %}<label><input type="checkbox" value="{{ ct }}" checked onchange="msItemChange('ms-comp-ct')"> {{ ct }}</label>{% endfor %}
+            </div>
+          </div>
+        </div>
+        <span class="ctrl-label">Sample</span>
+        <div class="ms-wrap" id="ms-comp-samp">
+          <button type="button" class="ms-trigger" onclick="msToggle('ms-comp-samp')">
+            <span class="ms-trigger-text" id="ms-comp-samp-lbl">All selected</span><span class="ms-arrow">&#9660;</span>
+          </button>
+          <div class="ms-panel" id="ms-comp-samp-panel">
+            <input class="ms-search" placeholder="Search…" oninput="msFilter('ms-comp-samp',this.value)">
+            <div class="ms-list" id="ms-comp-samp-list">
+              <label><input type="checkbox" value="All" checked onchange="msAllToggle('ms-comp-samp',this)"> All</label>
+              {% for s in samples %}<label><input type="checkbox" value="{{ s }}" checked onchange="msItemChange('ms-comp-samp')"> {{ s }}</label>{% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="section-title">Plot Type</div>
+        <div class="radio-group">
+          <label><input type="radio" name="comp_plot_type" value="bar" checked> Stacked Bar</label>
+          <label><input type="radio" name="comp_plot_type" value="box"> Box Plot</label>
+        </div>
+      </div>
+      <div class="err-box" id="comp-err"></div>
+      <button class="btn-run" onclick="runComposition()">&#9654; Plot</button>
+    </div>
+    <div class="plot-area" style="overflow:hidden">
+      <!-- dynamic grid: 1, 2, or 3 columns depending on genotype selection -->
+      <div class="comp-grid cols-3" id="comp-grid" style="flex:1;min-height:0">
+        <div class="plot-card" id="comp-card-all">
+          <div class="plot-card-header"><span class="plot-card-title">APOE 33 & 44 — Merged</span><span class="plot-card-sub">all samples aggregated</span></div>
+          <div class="plot-div" id="plot-comp-all" style="min-height:460px"></div>
+        </div>
+        <div class="plot-card" id="comp-card-33">
+          <div class="plot-card-header"><span class="plot-card-title">APOE 33 Only</span><span class="plot-card-sub">n=4 samples</span></div>
+          <div class="plot-div" id="plot-comp-33" style="min-height:460px"></div>
+        </div>
+        <div class="plot-card" id="comp-card-44">
+          <div class="plot-card-header"><span class="plot-card-title">APOE 44 Only</span><span class="plot-card-sub">n=4 samples</span></div>
+          <div class="plot-div" id="plot-comp-44" style="min-height:460px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     TAB 4: DATA TABLES
+     ═══════════════════════════════════════════════════════ -->
+<div id="tab-summary" class="tab-panel">
+  <div class="tab-content">
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="section-title">Table View</div>
+        <div class="radio-group">
+          <label><input type="radio" name="tbl_view" value="expr" checked onchange="switchTableView('expr')"> Expression Summary</label>
+          <label><input type="radio" name="tbl_view" value="cellprop" onchange="switchTableView('cellprop')"> Cell Proportion</label>
+        </div>
+      </div>
+      <div id="tbl-expr-filters">
+        <div class="sidebar-section">
+          <div class="section-title">Query Filters</div>
+          <span class="ctrl-label">Genes (up to 5)</span>
+          <div class="gene-tags-wrap">
+            <div class="gene-tags" id="sum-gene-tags"></div>
+            <div class="gene-ac-wrap">
+              <input class="gene-ac-input" id="sum_gene_input" placeholder="Add gene…" autocomplete="off">
+              <div class="gene-ac-drop" id="sum_gene_drop"></div>
+            </div>
+            <div style="font-size:10px;color:#8898bb;margin-top:3px">Type to search all genes. Press Enter or click to add.</div>
+          </div>
+          <span class="ctrl-label">APOE Genotype</span>
+          <div class="ms-wrap" id="ms-sum-geno">
+            <button type="button" class="ms-trigger" onclick="msToggle('ms-sum-geno')">
+              <span class="ms-trigger-text" id="ms-sum-geno-lbl">All selected</span><span class="ms-arrow">&#9660;</span>
+            </button>
+            <div class="ms-panel" id="ms-sum-geno-panel">
+              <div class="ms-list" id="ms-sum-geno-list">
+                <label><input type="checkbox" value="All" checked onchange="msAllToggle('ms-sum-geno',this)"> All</label>
+                <label><input type="checkbox" value="APOE 33" checked onchange="msItemChange('ms-sum-geno')"> APOE 33</label>
+                <label><input type="checkbox" value="APOE 44" checked onchange="msItemChange('ms-sum-geno')"> APOE 44</label>
+              </div>
+            </div>
+          </div>
+          <span class="ctrl-label">Cell Type</span>
+          <div class="ms-wrap" id="ms-sum-ct">
+            <button type="button" class="ms-trigger" onclick="msToggle('ms-sum-ct')">
+              <span class="ms-trigger-text" id="ms-sum-ct-lbl">All</span><span class="ms-arrow">&#9660;</span>
+            </button>
+            <div class="ms-panel" id="ms-sum-ct-panel">
+              <input class="ms-search" placeholder="Search…" oninput="msFilter('ms-sum-ct',this.value)">
+              <div class="ms-list" id="ms-sum-ct-list">
+                <label><input type="checkbox" value="all" checked onchange="msAllToggle('ms-sum-ct',this)"> All</label>
+                {% for ct in cell_types %}<label><input type="checkbox" value="{{ ct }}" onchange="msItemChange('ms-sum-ct')"> {{ ct }}</label>{% endfor %}
+              </div>
+            </div>
+          </div>
+          <span class="ctrl-label">Sample</span>
+          <div class="ms-wrap" id="ms-sum-samp">
+            <button type="button" class="ms-trigger" onclick="msToggle('ms-sum-samp')">
+              <span class="ms-trigger-text" id="ms-sum-samp-lbl">All</span><span class="ms-arrow">&#9660;</span>
+            </button>
+            <div class="ms-panel" id="ms-sum-samp-panel">
+              <input class="ms-search" placeholder="Search…" oninput="msFilter('ms-sum-samp',this.value)">
+              <div class="ms-list" id="ms-sum-samp-list">
+                <label><input type="checkbox" value="all" checked onchange="msAllToggle('ms-sum-samp',this)"> All</label>
+                {% for s in samples %}<label><input type="checkbox" value="{{ s }}" onchange="msItemChange('ms-sum-samp')"> {{ s }}</label>{% endfor %}
+              </div>
+            </div>
+          </div>
+          <span class="ctrl-label">Min Expression</span>
+          <input type="number" id="sum_min_expr" value="0" min="0" step="0.01">
+          <span class="ctrl-label">Row Limit</span>
+          <input type="number" id="sum_limit" value="200" min="10" max="2000" step="50">
+        </div>
+        <div class="sidebar-section">
+          <div class="section-title">Extra Columns</div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <label style="display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer;color:#2c3a5e"><input type="checkbox" id="col_umap" onchange="rebuildTableCols()" style="accent-color:#1a3480"> UMAP Coords</label>
+          </div>
+        </div>
+        <div class="err-box" id="sum-err"></div>
+        <button class="btn-run" onclick="runSummary()">&#9654; Query</button>
+        <button class="btn-run" id="btn-download-csv" onclick="downloadTableCSV()" style="margin-top:8px;background:linear-gradient(135deg,#1a6640,#28a060)" disabled>&#11015; Download CSV</button>
+      </div>
+      <div id="tbl-cp-filters" style="display:none">
+        <div class="sidebar-section">
+          <div class="section-title">Query Filters</div>
+          <span class="ctrl-label">APOE Genotype</span>
+          <div class="ms-wrap" id="ms-cp-geno">
+            <button type="button" class="ms-trigger" onclick="msToggle('ms-cp-geno')">
+              <span class="ms-trigger-text" id="ms-cp-geno-lbl">All selected</span><span class="ms-arrow">&#9660;</span>
+            </button>
+            <div class="ms-panel" id="ms-cp-geno-panel">
+              <div class="ms-list" id="ms-cp-geno-list">
+                <label><input type="checkbox" value="All" checked onchange="msAllToggle('ms-cp-geno',this)"> All</label>
+                <label><input type="checkbox" value="APOE 33" checked onchange="msItemChange('ms-cp-geno')"> APOE 33</label>
+                <label><input type="checkbox" value="APOE 44" checked onchange="msItemChange('ms-cp-geno')"> APOE 44</label>
+              </div>
+            </div>
+          </div>
+          <span class="ctrl-label">Cell Type</span>
+          <div class="ms-wrap" id="ms-cp-ct">
+            <button type="button" class="ms-trigger" onclick="msToggle('ms-cp-ct')">
+              <span class="ms-trigger-text" id="ms-cp-ct-lbl">All</span><span class="ms-arrow">&#9660;</span>
+            </button>
+            <div class="ms-panel" id="ms-cp-ct-panel">
+              <input class="ms-search" placeholder="Search…" oninput="msFilter('ms-cp-ct',this.value)">
+              <div class="ms-list" id="ms-cp-ct-list">
+                <label><input type="checkbox" value="all" checked onchange="msAllToggle('ms-cp-ct',this)"> All</label>
+                {% for ct in cell_types %}<label><input type="checkbox" value="{{ ct }}" onchange="msItemChange('ms-cp-ct')"> {{ ct }}</label>{% endfor %}
+              </div>
+            </div>
+          </div>
+          <span class="ctrl-label">Sample</span>
+          <div class="ms-wrap" id="ms-cp-samp">
+            <button type="button" class="ms-trigger" onclick="msToggle('ms-cp-samp')">
+              <span class="ms-trigger-text" id="ms-cp-samp-lbl">All</span><span class="ms-arrow">&#9660;</span>
+            </button>
+            <div class="ms-panel" id="ms-cp-samp-panel">
+              <input class="ms-search" placeholder="Search…" oninput="msFilter('ms-cp-samp',this.value)">
+              <div class="ms-list" id="ms-cp-samp-list">
+                <label><input type="checkbox" value="all" checked onchange="msAllToggle('ms-cp-samp',this)"> All</label>
+                {% for s in samples %}<label><input type="checkbox" value="{{ s }}" onchange="msItemChange('ms-cp-samp')"> {{ s }}</label>{% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="err-box" id="cp-err"></div>
+        <button class="btn-run" onclick="runCellPropTable()">&#9654; Query</button>
+        <button class="btn-run" id="btn-download-cp" onclick="downloadCPTableCSV()" style="margin-top:8px;background:linear-gradient(135deg,#1a6640,#28a060)" disabled>&#11015; Download CSV</button>
+      </div>
+    </div>
+    <div class="plot-area" style="overflow:hidden;padding:14px">
+      <div id="tbl-expr-panel" class="plot-card" style="flex:1;min-height:0;overflow:hidden">
+        <div class="plot-card-header"><span class="plot-card-title" id="sum-title">Expression Data Table</span><span class="plot-card-sub" id="sum-sub"></span></div>
+        <div style="overflow:auto;flex:1;min-height:0" id="tbl-scroll">
+          <table id="sum-table">
+            <thead id="sum-thead"><tr><th>Gene</th><th>Cell ID</th><th>Expression</th><th>Cell Type</th><th>Genotype</th><th>Sample</th></tr></thead>
+            <tbody id="sum-tbody"><tr><td colspan="6" style="padding:20px;color:#aab0c4;font-style:italic">Select gene and click &#9654; Query to load data.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="tbl-cp-panel" class="plot-card" style="flex:1;min-height:0;overflow:hidden;display:none">
+        <div class="plot-card-header"><span class="plot-card-title">Cell Type Proportion Table</span><span class="plot-card-sub" id="cp-sub"></span></div>
+        <div style="overflow:auto;flex:1;min-height:0">
+          <table id="cp-table">
+            <thead><tr><th>Sample</th><th>Genotype</th><th>Cell Type</th><th>Count (n)</th><th>Proportion</th></tr></thead>
+            <tbody id="cp-tbody"><tr><td colspan="5" style="padding:20px;color:#aab0c4;font-style:italic">Select options and click &#9654; Query to load data.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     TAB 5: ABOUT
+     ═══════════════════════════════════════════════════════ -->
+<div id="tab-explanation" class="tab-panel active">
+  <div class="tab-content">
+    <div class="about-body">
+      <div class="about-card">
+        <div class="about-card-header">
+          <span class="about-card-title">About This Project</span>
+          <span class="about-card-sub">TCW Laboratory &middot; Team 14 &middot; BF768</span>
+        </div>
+        <h2>Overview</h2>
+        <p>The scRNA-seq Explorer is an interactive web application for investigating cellular heterogeneity and genotype-associated differences in iPSC-derived Alzheimer's disease models. By integrating cell type annotation, gene expression across ~19,000 genes, and sample-level composition, this platform enables exploration of how APOE genotype influences cell population structure and transcriptional activity across major neural cell types.</p>
+        <h2>Biological Background</h2>
+        <p>Alzheimer’s disease is a neurodegenerative disorder characterized by cell-type-specific dysfunction in the brain. A major genetic risk factor is the Apolipoprotein E (APOE) gene, where the APOE33 genotype represents a baseline condition and APOE44 is associated with increased disease risk. To study how APOE genotype influences cellular function, this dataset uses single-cell RNA sequencing (scRNA-seq) from CRISPR-edited iPSC-derived brain cells. This controlled design allows for direct comparison of gene expression across genotypes at single-cell resolution, enabling identification of cell-type-specific differences associated with Alzheimer’s disease.</p>
+        <h2>Platform Features</h2>
+        <ul>
+          <li><strong>Single-cell Expression:</strong> Visualizes cell clustering via UMAP across all three genotype views (All, APOE 33, APOE 44) simultaneously — for both cell type annotation and per-gene expression. Supports violin, dot, and scatter plot views for any of the ~19,000 genes.</li>
+          <li><strong>Multi-Gene Expression:</strong> Compares expression patterns across multiple selected genes using dot plots (bubble size = % expressing, color = avg log-normalized expression) or heatmaps clustered by expression level.</li>
+          <li><strong>Cell Type Composition:</strong> Displays relative abundance of each cell type per sample. The merged panel aggregates both genotypes; individual genotype panels show APOE 33 or APOE 44 samples separately. Toggle which panels are visible using the genotype checkboxes.</li>
+          <li><strong>Data Tables:</strong> Queryable datasets of gene expression values and cell type proportions, with searchable gene and cell type filters. Results can be downloaded as CSV.</li>
+          <li><strong>Interactive Visualizations:</strong> All plots are built using Plotly, allowing users to hover over data points to view detailed information such as gene expression values, cell type labels, and sample metadata. Users can also click or double-click legend items to isolate or hide specific groups, enabling more focused comparisons across conditions. In addition, clicking legend items allows users to toggle between APOE33 and APOE44 views, an interactive feature provided by Plotly.</li>
+        </ul>
+        <h2>Sample &amp; Replicate Information</h2>
+        <p>Samples are labeled as APOE33_1.1, APOE33_1.2, APOE33_2.1, APOE33_2.2 (and similarly for APOE44), where each genotype includes data from two individuals, with two replicate samples per individual. For example, APOE33_1.1 and APOE33_1.2 come from the same individual, while APOE33_2.1 and APOE33_2.2 come from a second individual; the same structure applies to the APOE44 samples. This design allows us to compare differences between individuals while also assessing consistency within the same individual across replicates, improving the reliability of downstream analyses.</p>
+        <h2>How Filters Affect Each Visualization</h2>
+        <ul>
+          <li><strong>Single-cell Expression:</strong> Cell type filters restrict which cells appear across all six UMAP panels. Each column represents a genotype split (All / APOE 33 / APOE 44) automatically.</li>
+          <li><strong>Multi-Gene Expression:</strong> Genotype and cell type filters restrict cells included in dot plot and heatmap calculations.</li>
+          <li><strong>Cell Type Composition:</strong> The genotype checkboxes control which panels are displayed. The merged "All" panel aggregates both genotypes into a single average proportion. Cell type filters restrict which cell types appear in all panels.</li>
+        </ul>
+        <h2>Data Description</h2>
+        <p>The dataset consists of processed scRNA-seq outputs including UMAP dimensionality reduction and log-normalized gene expression values for approximately 19,000 genes. All visualizations query a relational MariaDB database, enabling efficient gene-level lookups via indexed long-format expression tables.</p>
+        <h2>Interpretation Notes</h2>
+        <p>All expression values are log-normalized. In UMAP plots, higher color intensity indicates higher expression. In dot plots, bubble size represents the proportion of cells expressing the gene and color represents average log-normalized expression. Comparisons reflect relative rather than absolute expression levels.</p>
+        <h2>Limitations</h2>
+        <p>The dataset includes a limited number of samples, which may introduce sampling bias. Certain cell types may be over- or under-represented. Expression values are log-normalized and relative.</p>
+        <h2>Attribution</h2>
+        <p>Developed by Team 14 (Wendy Bui, Chloe Ploss, Vaidehi Gupta, Mildred Monsivais) as part of BF768 at Boston University in collaboration with the TCW Laboratory. Learn more: <a href="https://sites.bu.edu/tcwlab/" target="_blank">TCW Laboratory Website</a></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="status-bar" id="status-bar">Ready — select gene and click &#9654; Plot.</div>
+
+<script>
+const QUERY_URL     = "{{ url_for('query') }}";
+const COMP_URL      = "{{ url_for('cell_composition') }}";
+const SUMMARY_URL   = "{{ url_for('summary') }}";
+const MULTIGENE_URL = "{{ url_for('multigene') }}";
+const CELLPROP_URL  = "{{ url_for('cellprop_table') }}";
+const GENES_URL     = "{{ url_for('genes') }}";
+const CELLS_URL     = "{{ url_for('cells') }}";
+
+// ── Colors ─────────────────────────────────────────────────────────────────
+const GENO_COLORS = {'APOE 33':'#1a5fa8','APOE 44':'#c0392b'};
+const GENO_MUTED  = {'APOE 33':'#9ecae1','APOE 44':'#fcae91'};
+const CT_ORDER    = ['Astro-1','Astro-2','Exc-1','Exc-2','Exc-3','Inh','NPC','OPC','VLMC','Micro','GPC'];
+const CT_COLORS   = {
+  'Astro-1':'#1f77b4','Astro-2':'#17becf',
+  'Exc-1':'#2ca02c','Exc-2':'#98df8a','Exc-3':'#c7e9a0',
+  'Inh':'#e15759','NPC':'#f28e2b','OPC':'#e377c2',
+  'VLMC':'#9467bd','Micro':'#8c564b','GPC':'#bcbd22'
+};
+const PALETTE = ['#4e79a7','#f28e2b','#e15759','#76b7b2','#59a14f','#edc948','#b07aa1','#ff9da7','#9c755f','#bab0ac'];
+
+function gc(g)  { return GENO_COLORS[g]  || '#888'; }
+function gcm(g) { return GENO_MUTED[g]   || '#bbb'; }
+function ctc(ct){ return CT_COLORS[ct]   || PALETTE[CT_ORDER.indexOf(ct) % PALETTE.length] || '#888'; }
+function sortCTs(cts){
+  return [...cts].sort((a,b)=>{
+    const ia=CT_ORDER.indexOf(a), ib=CT_ORDER.indexOf(b);
+    if(ia>=0&&ib>=0) return ia-ib;
+    if(ia>=0) return -1; if(ib>=0) return 1;
+    return a.localeCompare(b);
+  });
+}
+
+// Shared axis/font sizes — consistent across all plots
+const AXIS_FONT  = 12;  // tick labels
+const TITLE_FONT = 14;  // axis titles (same as card header font)
+
+const LAYOUT_BASE = {
+  plot_bgcolor: 'white',
+  paper_bgcolor: 'white',
+  margin:{l:55,r:20,t:10,b:55},
+  font:{family:"'Segoe UI',Arial,sans-serif", size:AXIS_FONT, color:'#2c3a5e'},
+  legend:{font:{size:10}, bgcolor:'rgba(255,255,255,0.9)', bordercolor:'#d4daea', borderwidth:1, itemsizing:'constant'}
+};
+const EXPR_CS = [[0,'#d6e4f7'],[0.2,'#93bfe8'],[0.5,'#3382c4'],[0.8,'#1a5fa8'],[1,'#061a3d']];
+const EXPR_CS_44 = [[0,'#fee0d2'],[0.2,'#fc9272'],[0.5,'#de2d26'],[0.8,'#c0392b'],[1,'#67000d']];
+const EXPR_CS_MERGED = [[0, '#ffffff'],[0.25, '#d1c4e9'],[0.55, '#9575cd'],[0.8, '#5e35b1'],[1, '#311b92']];
+
+function axisBase(title){
+  return {
+    title:{text:title, font:{size:TITLE_FONT, color:'#2c3a5e'}, standoff:6},
+    tickfont:{size:AXIS_FONT},
+    zeroline:false, automargin:true
+  };
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function showTab(name,btn){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+function setStatus(m){document.getElementById('status-bar').textContent=m;}
+function showSpin(id,on){document.getElementById(id).style.display=on?'block':'none';}
+function showErr(id,msg){const el=document.getElementById(id);el.textContent=msg?'⚠ '+msg:'';el.style.display=msg?'block':'none';}
+async function postFD(url,fd){
+  const r=await fetch(url,{method:'POST',body:fd});
+  if(!r.ok) throw new Error('Server '+r.status);
+  const t=await r.text();
+  try{return JSON.parse(t);}catch(e){throw new Error('Bad JSON from server — is Flask running?');}
+}
+
+// ── Gene autocomplete ────────────────────────────────────────────────────────
+let _acTimers = {};
+function initAC(inputId, dropId, hiddenId){
+  const inp  = document.getElementById(inputId);
+  const drop = document.getElementById(dropId);
+  const hid  = document.getElementById(hiddenId);
+  if(hid) inp.value = hid.value;
+  inp.addEventListener('input', ()=>{
+    clearTimeout(_acTimers[inputId]);
+    const q = inp.value.trim();
+    if(q.length < 2){drop.style.display='none'; return;}
+    _acTimers[inputId] = setTimeout(async ()=>{
+      try{
+        const r = await fetch(GENES_URL+'?q='+encodeURIComponent(q));
+        const gs = await r.json();
+        if(!gs.length){drop.style.display='none'; return;}
+        drop.innerHTML = gs.map(g=>`<div class="gene-ac-item" onmousedown="selectAC('${g}','${inputId}','${dropId}','${hiddenId}')">${g}</div>`).join('');
+        drop.style.display='block';
+      }catch(e){}
+    },300);
+  });
+  inp.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){e.preventDefault(); const first=drop.querySelector('.gene-ac-item'); if(first) first.dispatchEvent(new Event('mousedown'));}
+    if(e.key==='Escape'){drop.style.display='none';}
+  });
+  inp.addEventListener('blur', ()=>setTimeout(()=>{drop.style.display='none';},150));
+}
+function selectAC(gene,inputId,dropId,hiddenId){
+  document.getElementById(inputId).value = gene;
+  if(hiddenId) document.getElementById(hiddenId).value = gene;
+  document.getElementById(dropId).style.display='none';
+}
+
+// ── Multi-gene tag input ─────────────────────────────────────────────────────
+let mgGenes = ['APOE','GFAP','MAPT'];
+function renderMgTags(){
+  document.getElementById('mg-gene-tags').innerHTML = mgGenes.map(g=>
+    `<span class="gene-tag">${g} <button onclick="mgRemoveGene('${g}')">&#215;</button></span>`
+  ).join('');
+}
+function mgRemoveGene(g){ mgGenes=mgGenes.filter(x=>x!==g); renderMgTags(); }
+function mgAddGene(g){ if(!g||mgGenes.includes(g)||mgGenes.length>=10) return; mgGenes.push(g); renderMgTags(); }
+function initMgAC(){
+  const inp  = document.getElementById('mg_gene_input');
+  const drop = document.getElementById('mg_gene_drop');
+  inp.addEventListener('input',()=>{
+    clearTimeout(_acTimers['mg']);
+    const q=inp.value.trim();
+    if(q.length<2){drop.style.display='none'; return;}
+    _acTimers['mg']=setTimeout(async()=>{
+      try{
+        const r=await fetch(GENES_URL+'?q='+encodeURIComponent(q));
+        const gs=await r.json();
+        if(!gs.length){drop.style.display='none'; return;}
+        drop.innerHTML=gs.map(g=>`<div class="gene-ac-item" onmousedown="mgPickGene('${g}')">${g}</div>`).join('');
+        drop.style.display='block';
+      }catch(e){}
+    },150);
+  });
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.preventDefault();const first=drop.querySelector('.gene-ac-item');if(first)first.dispatchEvent(new Event('mousedown'));}
+    if(e.key==='Escape'){drop.style.display='none';}
+  });
+  inp.addEventListener('blur',()=>setTimeout(()=>{drop.style.display='none';},150));
+}
+function mgPickGene(g){ mgAddGene(g); document.getElementById('mg_gene_input').value=''; document.getElementById('mg_gene_drop').style.display='none'; }
+
+// ── Multiselect ──────────────────────────────────────────────────────────────
+function msToggle(id){
+  const panel=document.getElementById(id+'-panel');
+  const isOpen=panel.classList.contains('open');
+  document.querySelectorAll('.ms-panel.open').forEach(p=>p.classList.remove('open'));
+  if(!isOpen) panel.classList.add('open');
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.ms-wrap')) document.querySelectorAll('.ms-panel.open').forEach(p=>p.classList.remove('open'));
+});
+function msFilter(id,q){
+  document.getElementById(id+'-list').querySelectorAll('label').forEach(l=>{
+    const v=l.querySelector('input').value;
+    if(v==='All'||v==='all') return;
+    l.style.display=l.textContent.trim().toLowerCase().includes(q.toLowerCase())?'':'none';
+  });
+}
+function msAllToggle(id,cb){
+  document.getElementById(id+'-list').querySelectorAll('input[type="checkbox"]').forEach(inp=>{inp.checked=cb.checked;});
+  msUpdateLabel(id);
+}
+function msItemChange(id){
+  const list=document.getElementById(id+'-list');
+  const allCb=list.querySelector('input[value="All"],input[value="all"]');
+  const items=[...list.querySelectorAll('input[type="checkbox"]')].filter(cb=>cb.value!=='All'&&cb.value!=='all');
+  if(allCb) allCb.checked=items.every(cb=>cb.checked);
+  msUpdateLabel(id);
+}
+function msUpdateLabel(id){
+  const list=document.getElementById(id+'-list');
+  const items=[...list.querySelectorAll('input[type="checkbox"]')].filter(cb=>cb.value!=='All'&&cb.value!=='all');
+  const checked=items.filter(cb=>cb.checked);
+  const lbl=document.getElementById(id+'-lbl');
+  if(!lbl) return;
+  if(checked.length===0) lbl.textContent='None selected';
+  else if(checked.length===items.length) lbl.textContent='All selected';
+  else if(checked.length===1) lbl.textContent=checked[0].value;
+  else lbl.textContent=`${checked.length} selected`;
+}
+function msGetChecked(id){
+  const list=document.getElementById(id+'-list');
+  const allCb=list.querySelector('input[value="All"],input[value="all"]');
+  if(allCb&&allCb.checked) return [];
+  return [...list.querySelectorAll('input[type="checkbox"]:checked')].filter(cb=>cb.value!=='All'&&cb.value!=='all').map(cb=>cb.value);
+}
+
+// ── Cells cache + query cache ────────────────────────────────────────────────
+let _cellsData = null;
+let _qCache    = {};
+let _umapGen   = 0;
+
+async function getCells(){
+  if(_cellsData) return _cellsData;
+  const r = await fetch(CELLS_URL);
+  if(!r.ok) throw new Error('cells fetch failed');
+  const d = await r.json();
+  if(!Array.isArray(d)) throw new Error(d.error||'cells error');
+  _cellsData = d;
+  return d;
+}
+async function cachedQuery(gene, plotType, cts, genos, samples = []){
+  const key = [gene, plotType, ...[...cts].sort(), ...[...genos].sort()].join('|');
+  if(_qCache[key]) return _qCache[key];
+  const fd = new FormData();
+  fd.append('gene', gene);
+  fd.append('plot_type', plotType);
+  cts.forEach(c   => fd.append('cell_type', c));
+  genos.forEach(g => fd.append('genotype', g));
+  samples.forEach(s => fd.append('sample', s));
+  const res = await postFD(QUERY_URL, fd);
+  if(!res.error){
+    _qCache[key] = res;
+    const ks = Object.keys(_qCache);
+    if(ks.length > 15) delete _qCache[ks[0]];
+  }
+  return res;
+}
+
+// ── UMAP column grid helpers ─────────────────────────────────────────────────
+function getUmapGenoSelection(){
+  const allCb = document.querySelector('#ms-mg-geno-list input[value="All"]');
+  const cb33  = document.querySelector('#ms-mg-geno-list input[value="APOE 33"]');
+  const cb44  = document.querySelector('#ms-mg-geno-list input[value="APOE 44"]');
+  return {
+    showAll: allCb?.checked ?? true,
+    show33:  cb33?.checked  ?? true,
+    show44:  cb44?.checked  ?? true,
+    serverGenos: [
+      ...(cb33?.checked ? ['APOE 33'] : []),
+      ...(cb44?.checked ? ['APOE 44'] : []),
+    ]
+  };
+}
+function updateGenoCols(){
+  const { showAll, show33, show44 } = getUmapGenoSelection();
+
+  // 1. Calculate how many columns are actually checked
+  const activeCount = [showAll, show33, show44].filter(Boolean).length;
+
+  const grid = document.getElementById('umap-grid');
+
+  // 2. Fallback: If nothing is checked, default to showing the 'All' column
+  if(activeCount === 0) {
+      document.getElementById('umap-col-all').style.display = 'flex';
+      grid.style.gridTemplateColumns = '1fr';
+  } else {
+      // 3. Set the grid to 1, 2, or 3 equal columns
+      grid.style.gridTemplateColumns = `repeat(${activeCount}, 1fr)`;
+
+      // 4. Toggle visibility of the specific columns
+      document.getElementById('umap-col-all').style.display = showAll ? 'flex' : 'none';
+      document.getElementById('umap-col-33').style.display = show33 ? 'flex' : 'none';
+      document.getElementById('umap-col-44').style.display = show44 ? 'flex' : 'none';
+  }
+
+  // 5. CRITICAL: Trigger a resize so Plotly fits the new square aspect-ratio
+  window.dispatchEvent(new Event('resize'));
+}
+
+function onRightPanelChange(){
+  const v = document.querySelector('input[name="right_panel"]:checked').value;
+  const isUmap = v === 'umap';
+  ['all','33','44'].forEach(id => {
+    const ec = document.getElementById('expr-card-'+id);
+    const ac = document.getElementById('alt-card-'+id);
+    ec.style.display = isUmap ? 'flex' : 'none';
+    ac.style.display = isUmap ? 'none' : 'flex';
+    if(isUmap){ ec.style.flexDirection='column'; }
+    else{ ac.style.flexDirection='column'; }
+  });
+}
+
+function renderCTumap(divId, data){
+  if(!data.length){Plotly.purge(divId); return;}
+  const cts = sortCTs([...new Set(data.map(d=>d.cell_type))]);
+  const traces = cts.map(ct=>{
+    const sub=data.filter(d=>d.cell_type===ct);
+    return {x:sub.map(d=>d.umap1),y:sub.map(d=>d.umap2),
+      text:sub.map(d=>`<b>${d.cell_type}</b><br>${d.genotype}`),
+      mode:'markers',type:'scatter',name:ct,
+      hovertemplate:'%{text}<extra></extra>',
+      marker:{size:3,opacity:0.8,color:ctc(ct)}};
+  });
+  Plotly.newPlot(divId,traces,{...LAYOUT_BASE,
+    margin:{l:48,r:10,t:8,b:46},
+    xaxis:{...axisBase('UMAP 1'), showgrid:false, ticks:'outside'},
+    yaxis:{...axisBase('UMAP 2'), showgrid:false, ticks:'outside'},
+    showlegend:true, legend:{...LAYOUT_BASE.legend,font:{size:9}}
+  },{responsive:true,displaylogo:false,modeBarButtonsToRemove:['lasso2d','select2d']});
+}
+function renderExprUmap(divId, data, gene, geno){
+  if(!data.length){ Plotly.purge(divId); return; }
+  const exprs = data.map(d => d.expr);
+  const maxE  = Math.max(...exprs, 0.001);
+  let cs;
+  if (geno === 'All') {
+    cs = EXPR_CS_MERGED;   // purple
+  } else if (geno === 'APOE 44') {
+    cs = EXPR_CS_44;       // red
+  } else {
+    cs = EXPR_CS;          // blue (APOE 33)
+  }
+  Plotly.newPlot(divId, [{
+    x: data.map(d => d.umap1),
+    y: data.map(d => d.umap2),
+    text: data.map(d => `<b>${d.cell_type}</b><br>${gene}: ${d.expr.toFixed(3)}`),
+    mode: 'markers',
+    type: 'scatter',
+    hovertemplate: '%{text}<extra></extra>',
+    marker: {
+      size: 3,
+      opacity: 0.85,
+      color: exprs,
+      colorscale: cs,
+      cmin: 0,
+      cmax: maxE,
+      showscale: true,
+      colorbar: {
+        title: {
+          text: `${gene}\nlog-normalized expression`,
+          side: 'right',
+          font: { size: 10 }
+        },
+        thickness: 10,
+        len: 0.6,
+        tickfont: { size: 9 }
+      }
+    }
+  }], {
+    ...LAYOUT_BASE,
+    margin: { l: 48, r: 58, t: 8, b: 46 },
+    xaxis: { ...axisBase('UMAP 1'), showgrid: false, ticks: 'outside' },
+    yaxis: { ...axisBase('UMAP 2'), showgrid: false, ticks: 'outside' },
+    showlegend: false
+  }, {
+    responsive: true,
+    displaylogo: false,
+    modeBarButtonsToRemove: ['lasso2d','select2d']
+  });
+}
+function renderViolinPanel(divId, data, gene, showLegend){
+  if(!data.length){Plotly.purge(divId);return;}
+  const genos=[...new Set(data.map(d=>d.g))].sort();
+  const traces=genos.map(g=>({
+    y:data.filter(d=>d.g===g).map(d=>d.v),
+    type:'violin',name:g,fillcolor:gc(g),line:{color:gc(g)},opacity:0.8,
+    box:{visible:true,fillcolor:gcm(g),line:{color:'#1a1a2e',width:1.5}},
+    meanline:{visible:true,color:'#1a1a2e',width:2},points:false
+  }));
+  Plotly.newPlot(divId,traces,{...LAYOUT_BASE,
+    violinmode:'overlay',violingap:0.3,violingroupgap:0.1,
+    margin:{l:62,r:12,t:8,b:58},
+    xaxis:{...axisBase('APOE Genotype')},
+    yaxis:{...axisBase(`${gene} log-normalized expression`)},
+    showlegend:showLegend
+  },{responsive:true,displaylogo:false});
+}
+function renderDotPanel(divId, data, gene, panelType){
+  // panelType: 'all' | '33' | '44'
+  if(!data.length){Plotly.purge(divId);return;}
+  const genos=[...new Set(data.map(d=>d.g))].sort();
+  const allAvg=data.map(d=>d.avg);
+  const maxAvg=Math.max(...allAvg,0.001);
+  const traces=genos.map((g,i)=>{
+    const sub=data.filter(d=>d.g===g);
+    const is44 = g === 'APOE 44';
+    const dotCS = is44
+      ? [[0,'#fee0d2'],[0.5,'#de2d26'],[1,'#67000d']]
+      : [[0,'#deebf7'],[0.5,'#3182bd'],[1,'#08519c']];
+    // 'all' panel: two stacked bars; '33'/'44' single panels: one bar each
+    let showscale, colorbar;
+    if(panelType === 'all'){
+      showscale = true;
+      colorbar = {
+        title:{text: is44 ? 'APOE44 Avg Expr' : 'APOE33 Avg Expr', side:'right', font:{size:10}},
+        thickness:12, len:0.38,
+        x: 1.02,
+        y: is44 ? 0.58 : 0.08,
+        tickfont:{size:9}
+      };
+    } else if((panelType === '33' && !is44) || (panelType === '44' && is44)){
+      showscale = true;
+      colorbar = {
+        title:{text: is44 ? 'APOE44 Average Log Expression' : 'APOE33 Average Log Expression', side:'right', font:{size:10}},
+        thickness:12, len:0.8,
+        x: 1.02, y: 0.3,
+        tickfont:{size:9}
+      };
+    } else {
+      showscale = false;
+      colorbar = {};
+    }
+    return{x:sub.map(d=>d.ct),y:sub.map(()=>g),mode:'markers',type:'scatter',name:g,
+      marker:{
+        size:sub.map(d=>Math.max(4,d.pct*44)),
+        color:sub.map(d=>d.avg),
+        colorscale: dotCS,
+        cmin:0, cmax:maxAvg,
+        showscale, colorbar,
+        line:{color:'rgba(0,0,0,0.15)',width:0.5}
+      },
+      text:sub.map(d=>`<b>${d.ct}</b><br>${g}<br>Avg: ${d.avg.toFixed(3)}<br>%: ${(d.pct*100).toFixed(1)}%`),
+      hovertemplate:'%{text}<extra></extra>'};
+  });
+  Plotly.newPlot(divId,traces,{...LAYOUT_BASE,
+    margin:{l:58,r:100,t:8,b:88},
+    xaxis:{...axisBase('Cell Type'), tickangle:-40, showgrid:true, gridcolor:'#eceef5'},
+    yaxis:{...axisBase('Genotype')},
+    showlegend:true
+  },{responsive:true,displaylogo:false});
+}
+function renderScatterPanel(divId, data, gene){
+  if(!data.length){Plotly.purge(divId);return;}
+  const genos=[...new Set(data.map(d=>d.genotype))].sort();
+  const traces=genos.map(g=>{
+    const sub=data.filter(d=>d.genotype===g);
+    return{x:sub.map(d=>d.cell_type),y:sub.map(d=>d.expr),mode:'markers',type:'scatter',name:g,
+      text:sub.map(d=>`<b>${d.cell_type}</b><br>${g}<br>${gene}: ${d.expr.toFixed(3)}`),
+      hovertemplate:'%{text}<extra></extra>',
+      marker:{size:3,color:gc(g),opacity:0.65}};
+  });
+  Plotly.newPlot(divId,traces,{...LAYOUT_BASE,
+    margin:{l:62,r:12,t:8,b:88},
+    xaxis:{...axisBase('Cell Type'), tickangle:-40, showgrid:true, gridcolor:'#eceef5'},
+    yaxis:{...axisBase(`${gene} log-norm expression`), showgrid:true, gridcolor:'#eceef5'},
+    showlegend:true
+  },{responsive:true,displaylogo:false,modeBarButtonsToRemove:['lasso2d','select2d']});
+}
+
+async function runUMAP(){
+  const myGen = ++_umapGen;
+  showSpin('umap-spinner',true);
+  showErr('err-box','');
+  setStatus('Fetching data…');
+
+  const gene     = document.getElementById('umap_gene_val').value || 'APOE';
+  const cts      = msGetChecked('ms-umap-ct');
+
+  const samples = msGetChecked('ms-umap-samp');
+  const rpanel   = document.querySelector('input[name="right_panel"]:checked').value;
+  const plotType = rpanel === 'umap' ? 'umap' : rpanel;
+  const { showAll, show33, show44, serverGenos } = getUmapGenoSelection();
+  try{
+    const [cellsRaw, exprRes] = await Promise.all([
+      getCells(),
+      cachedQuery(gene, plotType, cts, serverGenos, samples)
+    ]);
+    if(myGen !== _umapGen){ showSpin('umap-spinner',false); return; }
+    if(exprRes.error){ showErr('err-box',exprRes.error); setStatus('Query failed.'); showSpin('umap-spinner',false); return; }
+    updateGenoCols();
+    const cells = cts.length ? cellsRaw.filter(d=>cts.includes(d.cell_type)) : cellsRaw;
+    if(showAll) renderCTumap('plot-ct-all', cells);
+    if(show33)  renderCTumap('plot-ct-33',  cells.filter(d=>d.genotype==='APOE 33'));
+    if(show44)  renderCTumap('plot-ct-44',  cells.filter(d=>d.genotype==='APOE 44'));
+    const data = exprRes.data || [];
+    if(rpanel==='umap'){
+      const d33=data.filter(d=>d.genotype==='APOE 33');
+      const d44=data.filter(d=>d.genotype==='APOE 44');
+      if(showAll){ renderExprUmap('plot-expr-all', data, gene, 'All'); document.getElementById('expr-all-title').textContent=`${gene} Expr — All`; }
+      if(show33)  renderExprUmap('plot-expr-33',  d33, gene, 'APOE 33');
+      if(show44)  renderExprUmap('plot-expr-44',  d44, gene, 'APOE 44');
+      setStatus(`Plotted ${data.length.toLocaleString()} expressing cells · ${cells.length.toLocaleString()} total.`);
+    } else if(rpanel==='violin'){
+      if(!data.length){ showErr('err-box','No data returned.'); showSpin('umap-spinner',false); return; }
+      const v33=data.filter(d=>d.g==='APOE 33');
+      const v44=data.filter(d=>d.g==='APOE 44');
+      if(showAll){ renderViolinPanel('plot-alt-all', data, gene, true); document.getElementById('alt-title').textContent=`${gene} — Violin`; document.getElementById('alt-sub').textContent='box=IQR · line=mean'; }
+      if(show33){ renderViolinPanel('plot-alt-33', v33, gene, false); document.getElementById('alt-title-33').textContent=`${gene} — APOE 33`; }
+      if(show44){ renderViolinPanel('plot-alt-44', v44, gene, false); document.getElementById('alt-title-44').textContent=`${gene} — APOE 44`; }
+      setStatus(`Violin plotted · ${data.length.toLocaleString()} cells.`);
+    } else if(rpanel==='dot'){
+      if(!data.length){ showErr('err-box','No data returned.'); showSpin('umap-spinner',false); return; }
+      const d33=data.filter(d=>d.g==='APOE 33');
+      const d44=data.filter(d=>d.g==='APOE 44');
+      if(showAll){ renderDotPanel('plot-alt-all', data, gene, 'all'); document.getElementById('alt-title').textContent=`${gene} — Dot Plot`; document.getElementById('alt-sub').textContent='size=% expressed · color=avg expr'; }
+      if(show33){ renderDotPanel('plot-alt-33', d33, gene, '33'); document.getElementById('alt-title-33').textContent=`${gene} — APOE 33`; }
+      if(show44){ renderDotPanel('plot-alt-44', d44, gene, '44'); document.getElementById('alt-title-44').textContent=`${gene} — APOE 44`; }
+      setStatus(`Dot plot rendered · ${data.length.toLocaleString()} cells.`);
+    } else if(rpanel==='scatter'){
+      if(!data.length){ showErr('err-box','No data returned.'); showSpin('umap-spinner',false); return; }
+      const s33=data.filter(d=>d.genotype==='APOE 33');
+      const s44=data.filter(d=>d.genotype==='APOE 44');
+      if(showAll){ renderScatterPanel('plot-alt-all', data, gene); document.getElementById('alt-title').textContent=`${gene} — Scatter`; document.getElementById('alt-sub').textContent=`n=${data.length.toLocaleString()} cells`; }
+      if(show33){ renderScatterPanel('plot-alt-33', s33, gene); document.getElementById('alt-title-33').textContent=`${gene} — APOE 33`; }
+      if(show44){ renderScatterPanel('plot-alt-44', s44, gene); document.getElementById('alt-title-44').textContent=`${gene} — APOE 44`; }
+      setStatus(`Scatter plotted · ${data.length.toLocaleString()} cells.`);
+    }
+  }catch(err){
+    if(myGen!==_umapGen) return;
+    showErr('err-box',err.message); setStatus('Fetch error.');
+  }
+  if(myGen===_umapGen) showSpin('umap-spinner',false);
+}
+
+// ── Multi-gene ───────────────────────────────────────────────────────────────
+async function runMultigene(){
+  showSpin('mg-spinner',true);
+  showErr('mg-err','');
+  setStatus('Fetching multi-gene data…');
+  if(!mgGenes.length){showErr('mg-err','Add at least one gene.');showSpin('mg-spinner',false);return;}
+  const plotType=document.querySelector('input[name="mg_plot_type"]:checked').value;
+  const fd=new FormData();
+  fd.append('plot_type',plotType);
+  mgGenes.forEach(g=>fd.append('genes[]',g));
+  msGetChecked('ms-mg-geno2').forEach(g=>fd.append('genotype',g));
+  msGetChecked('ms-mg-ct').forEach(c=>fd.append('cell_type',c));
+  try{
+    const res=await postFD(MULTIGENE_URL,fd);
+    if(res.error){showErr('mg-err',res.error);setStatus('Error.');showSpin('mg-spinner',false);return;}
+    if(!res.data||!res.data.length){showErr('mg-err','No data.');showSpin('mg-spinner',false);return;}
+    const allCTs  = sortCTs([...new Set(res.data.map(d=>d.cell_type))]);
+    const allGenes= [...new Set(res.data.map(d=>d.gene))];
+    if(plotType==='dot'){
+      const genos=[...new Set(res.data.map(d=>d.genotype))].sort();
+      const allAvg=res.data.map(d=>d.avg);
+      const maxAvg=Math.max(...allAvg,0.001);
+
+      // Define the three possible scales
+      const scale33 = [[0,'#ffffff'],[0.25,'#a8c8ed'],[0.55,'#5090c8'],[0.8,'#1a5fa8'],[1,'#0a2e56']];
+      const scale44 = [[0,'#ffffff'],[0.25,'#f0a89e'],[0.55,'#d95f52'],[0.8,'#c0392b'],[1,'#6b1212']];
+      const scaleMerged = [[0, '#ffffff'], [0.25, '#d1c4e9'], [0.55, '#9575cd'], [0.8, '#5e35b1'], [1, '#311b92']];
+
+      const traces=genos.map((g, i)=>{
+          const sub=res.data.filter(d=>d.genotype===g);
+
+          // Pick the scale based on the genotype name
+          let currentScale = scaleMerged;
+          if(g === 'APOE 33') currentScale = scale33;
+          if(g === 'APOE 44') currentScale = scale44;
+
+          return {
+              x: sub.map(d => {
+                const ctIndex = allCTs.indexOf(d.cell_type);
+                return g === 'APOE 33' ? ctIndex - 0.18 : ctIndex + 0.18;
+                }),
+                y: sub.map(d => d.gene),
+              mode:'markers',
+              type:'scatter',
+              name:g,
+              marker:{
+                  size:sub.map(d=>Math.max(4,Math.round((d.avg/maxAvg)*40)+4)),
+                  color: sub.map(d => d.avg),
+                  colorscale: g === 'APOE 33'
+                    ? [[0,'#deebf7'],[0.5,'#3182bd'],[1,'#08519c']]
+                    : [[0,'#fee0d2'],[0.5,'#de2d26'],[1,'#67000d']], // Dynamic scale
+                  cmin: 0,
+                  cmax: maxAvg,
+                  showscale: true,
+                  colorbar: {
+                    title: {
+                      text: g === 'APOE 33'
+                        ? 'APOE33 Average Log Expression'
+                        : 'APOE44 Average Log Expression',
+                      side: 'right'
+                    },
+                    thickness: 12,
+                    len: 0.8,
+                    x: g === 'APOE 33' ? 1.02 : 1.12,
+                    y: 0.5
+                  },
+                  line:{color:'rgba(0,0,0,0.2)',width:0.5}
+              },
+              text:sub.map(d=>`<b>${d.cell_type}</b><br>${d.gene}<br>${g}<br>Avg: ${d.avg.toFixed(3)}<br>%: ${(d.pct*100).toFixed(1)}%`),
+              hovertemplate:'%{text}<extra></extra>'
+          };
+      });
+      Plotly.newPlot('plot-multigene',traces,{...LAYOUT_BASE,
+
+        plot_bgcolor: 'white',
+        paper_bgcolor: 'white',
+        margin:{l:88,r:20,t:12,b:112},
+        xaxis:{
+          ...axisBase('Cell Type'),
+          tickvals: allCTs.map((_, i) => i),
+          ticktext: allCTs,
+          tickangle:-40,
+          showgrid:true,
+          gridcolor:'#eceef5'
+        },
+        yaxis:{...axisBase('Gene')},
+        showlegend:true
+      },{responsive:true,displaylogo:false});
+      document.getElementById('mg-title').textContent=`Multi-Gene Dot Plot — ${mgGenes.join(' · ')}`;
+      document.getElementById('mg-sub').textContent =
+        'dot size = % expressed · dot color = APOE genotype · color intensity = average log expression';
+    } else if(plotType==='heatmap'){
+      const mat = allGenes.map(gene=>
+        allCTs.map(ct=>{
+          const hits=res.data.filter(d=>d.gene===gene&&d.cell_type===ct);
+          if(!hits.length) return 0;
+          return hits.reduce((s,d)=>s+d.avg,0)/hits.length;
+        })
+      );
+      const hmGenoChecked = msGetChecked('ms-mg-geno2');
+      let hmColorscale = EXPR_CS;
+      if(hmGenoChecked.length===1 && hmGenoChecked[0]==='APOE 33'){
+        // Blue for APOE 33
+        hmColorscale=[[0,'#ffffff'],[0.25,'#a8c8ed'],[0.55,'#5090c8'],[0.8,'#1a5fa8'],[1,'#0a2e56']];
+      } else if(hmGenoChecked.length===1 && hmGenoChecked[0]==='APOE 44'){
+        // Red for APOE44
+        hmColorscale=[[0,'#ffffff'],[0.25,'#f0a89e'],[0.55,'#d95f52'],[0.8,'#c0392b'],[1,'#6b1212']];
+      } else {
+        // Purple for Merged (33 + 44)
+        // Transition: White -> Light Purple -> Deep Plum
+        hmColorscale = [
+            [0, '#ffffff'],    // Zero expression
+            [0.25, '#d1c4e9'], // Very light lavender
+            [0.55, '#9575cd'], // Medium purple
+            [0.8, '#5e35b1'],  // Deep violet
+            [1, '#311b92']     // Dark plum
+          ];
+        }
+      Plotly.newPlot('plot-multigene',[{
+        z:mat, x:allCTs, y:allGenes,
+        type:'heatmap', colorscale:hmColorscale,
+        colorbar:{title:{text:'Avg log-norm expr',side:'right',font:{size:10}},thickness:14,tickfont:{size:9}},
+        hovertemplate:'<b>%{y}</b><br>%{x}<br>Avg expr: %{z:.3f}<extra></extra>'
+      }],{...LAYOUT_BASE,
+        margin:{l:88,r:96,t:18,b:112},
+        xaxis:{...axisBase('Cell Type'), tickangle:-40},
+        yaxis:{...axisBase('Gene')},
+        showlegend:false
+      },{responsive:true,displaylogo:false});
+      document.getElementById('mg-title').textContent=`Multi-Gene Heatmap — ${mgGenes.join(' · ')}`;
+      document.getElementById('mg-sub').textContent='color = avg log-normalized expression';
+    }
+    setStatus('Multi-gene plot rendered.');
+  }catch(err){showErr('mg-err',err.message);setStatus('Error.');}
+  showSpin('mg-spinner',false);
+}
+
+// ── Composition genotype checkbox logic ─────────────────────────────────────
+// "All (merged)" = both genotypes combined into one aggregated bar/box panel.
+// "APOE 33" and "APOE 44" = separate per-genotype panels.
+// Grid updates to 1/2/3 columns based on how many panels are visible.
+function compGenoAllToggle(cb){
+  // "All (merged)" is independent — does not sync individual genotype checkboxes
+  msUpdateLabel('ms-comp-geno');
+  updateCompGrid();
+}
+function compGenoItemChange(){
+  msUpdateLabel('ms-comp-geno');
+  updateCompGrid();
+}
+function updateCompGrid(){
+  const list = document.getElementById('ms-comp-geno-list');
+  const allCb = list.querySelector('input[value="All"]');
+  const cb33  = list.querySelector('input[value="APOE 33"]');
+  const cb44  = list.querySelector('input[value="APOE 44"]');
+  const showAll = allCb ? allCb.checked : true;
+  const show33  = cb33  ? cb33.checked  : true;
+  const show44  = cb44  ? cb44.checked  : true;
+  document.getElementById('comp-card-all').style.display = showAll ? '' : 'none';
+  document.getElementById('comp-card-33').style.display  = show33  ? '' : 'none';
+  document.getElementById('comp-card-44').style.display  = show44  ? '' : 'none';
+  const count = [showAll,show33,show44].filter(Boolean).length || 1;
+  const grid = document.getElementById('comp-grid');
+  grid.className = `comp-grid cols-${count}`;
+}
+
+function compAgg(data){
+  const bySample={};
+  data.forEach(d=>{
+    if(!bySample[d.sample]) bySample[d.sample]={};
+    bySample[d.sample][d.group]=d.prop;
+  });
+  const samples=Object.keys(bySample);
+  const cts=sortCTs([...new Set(data.map(d=>d.group))]);
+  const avg={};
+  cts.forEach(ct=>{
+    const vals=samples.map(s=>bySample[s]?.[ct]||0);
+    avg[ct]=vals.reduce((a,b)=>a+b,0)/vals.length;
+  });
+  const tot=Object.values(avg).reduce((a,b)=>a+b,0)||1;
+  cts.forEach(ct=>avg[ct]/=tot);
+  return {cts,avg};
+}
+function renderCompBar(divId, data, xLabel){
+  if(!data.length){Plotly.purge(divId);return;}
+  const {cts,avg}=compAgg(data);
+  const traces=cts.map(ct=>({
+    x:[xLabel], y:[avg[ct]],
+    name:ct, type:'bar',
+    marker:{color:ctc(ct)},
+    hovertemplate:`<b>${ct}</b><br>Avg proportion: %{y:.3f}<extra></extra>`
+  }));
+  Plotly.newPlot(divId,traces,{...LAYOUT_BASE,
+    barmode:'stack',
+    margin:{l:52,r:10,t:8,b:52},
+    xaxis:{...axisBase(''), tickfont:{size:AXIS_FONT}},
+    yaxis:{...axisBase('Avg proportion'), range:[0,1.02]},
+    showlegend:true, legend:{...LAYOUT_BASE.legend,font:{size:10},orientation:'v',tracegroupgap:2}
+  },{responsive:true,displaylogo:false});
+}
+function renderCompBox(divId, data){
+  if(!data.length){Plotly.purge(divId);return;}
+  const genos=[...new Set(data.map(d=>d.genotype))].sort();
+  const traces=genos.map(g=>{
+    const sub=data.filter(d=>d.genotype===g);
+    return{
+      x:sub.map(d=>d.group), y:sub.map(d=>d.prop),
+      name:g, type:'box',
+      boxpoints:'all', jitter:0.3, pointpos:0, whiskerwidth:0.5,
+      marker:{color:gc(g),size:5,opacity:0.85},
+      line:{color:gc(g)}, fillcolor:gcm(g),
+      hovertemplate:`<b>%{x}</b><br>${g}<br>Prop: %{y:.3f}<extra></extra>`
+    };
+  });
+  Plotly.newPlot(divId,traces,{...LAYOUT_BASE,
+    boxmode:'group',
+    margin:{l:52,r:10,t:8,b:88},
+    xaxis:{...axisBase('Cell Type'), tickangle:-40, showgrid:false},
+    yaxis:{...axisBase('Proportion')},
+    showlegend:true, legend:{...LAYOUT_BASE.legend,font:{size:10}}
+  },{responsive:true,displaylogo:false});
+}
+
+async function runComposition(){
+  setStatus('Loading composition data…');
+  showErr('comp-err','');
+  const compType = document.querySelector('input[name="comp_plot_type"]:checked').value;
+  const list = document.getElementById('ms-comp-geno-list');
+  const showAll  = list.querySelector('input[value="All"]')?.checked ?? true;
+  const show33   = list.querySelector('input[value="APOE 33"]')?.checked ?? true;
+  const show44   = list.querySelector('input[value="APOE 44"]')?.checked ?? true;
+  if(!showAll && !show33 && !show44){
+    showErr('comp-err','Select at least one genotype panel.');
+    return;
+  }
+  updateCompGrid();
+  const fd=new FormData();
+  fd.append('plot_type','bar');
+  msGetChecked('ms-comp-ct').forEach(c=>fd.append('cell_type',c));
+  msGetChecked('ms-comp-samp').forEach(s=>fd.append('sample',s));
+  try{
+    const cd=await postFD(COMP_URL,fd);
+    if(cd.error){showErr('comp-err',cd.error);setStatus('Error.');return;}
+    if(!cd.data||!cd.data.length){showErr('comp-err','No data.');setStatus('No data.');return;}
+    const all=cd.data;
+    const d33=all.filter(d=>d.genotype==='APOE 33');
+    const d44=all.filter(d=>d.genotype==='APOE 44');
+    if(compType==='bar'){
+      if(showAll) renderCompBar('plot-comp-all', all,  'All Samples');
+      if(show33)  renderCompBar('plot-comp-33',  d33,  'APOE 33');
+      if(show44)  renderCompBar('plot-comp-44',  d44,  'APOE 44');
+    } else {
+      if(showAll) renderCompBox('plot-comp-all', all);
+      if(show33)  renderCompBox('plot-comp-33',  d33);
+      if(show44)  renderCompBox('plot-comp-44',  d44);
+    }
+    setStatus('Composition rendered.');
+  }catch(err){showErr('comp-err',err.message);setStatus('Error.');}
+}
+
+// ── Data tables ──────────────────────────────────────────────────────────────
+function switchTableView(v){
+  const isE=v==='expr';
+  document.getElementById('tbl-expr-filters').style.display=isE?'':'none';
+  document.getElementById('tbl-cp-filters').style.display=isE?'none':'';
+  document.getElementById('tbl-expr-panel').style.display=isE?'':'none';
+  document.getElementById('tbl-cp-panel').style.display=isE?'none':'';
+}
+let sumGenes=['APOE'];
+function renderSumTags(){
+  document.getElementById('sum-gene-tags').innerHTML=sumGenes.map(g=>
+    `<span class="gene-tag">${g} <button onclick="sumRemoveGene('${g}')">&#215;</button></span>`
+  ).join('');
+}
+function sumRemoveGene(g){sumGenes=sumGenes.filter(x=>x!==g);renderSumTags();}
+function sumAddGene(g){if(!g||sumGenes.includes(g)||sumGenes.length>=5)return;sumGenes.push(g);renderSumTags();}
+function initSumAC(){
+  const inp=document.getElementById('sum_gene_input');
+  const drop=document.getElementById('sum_gene_drop');
+  inp.addEventListener('input',()=>{
+    clearTimeout(_acTimers['sum']);
+    const q=inp.value.trim();
+    if(q.length<2){drop.style.display='none';return;}
+    _acTimers['sum']=setTimeout(async()=>{
+      try{
+        const r=await fetch(GENES_URL+'?q='+encodeURIComponent(q));
+        const gs=await r.json();
+        if(!gs.length){drop.style.display='none';return;}
+        drop.innerHTML=gs.map(g=>`<div class="gene-ac-item" onmousedown="sumPickGene('${g}')">${g}</div>`).join('');
+        drop.style.display='block';
+      }catch(e){}
+    },150);
+  });
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){e.preventDefault();const first=drop.querySelector('.gene-ac-item');if(first)first.dispatchEvent(new Event('mousedown'));else{const v=inp.value.trim().toUpperCase();if(v){sumAddGene(v);inp.value='';drop.style.display='none';}}}
+    if(e.key==='Escape'){drop.style.display='none';}
+  });
+  inp.addEventListener('blur',()=>setTimeout(()=>{drop.style.display='none';},150));
+}
+function sumPickGene(g){sumAddGene(g);document.getElementById('sum_gene_input').value='';document.getElementById('sum_gene_drop').style.display='none';}
+
+let _lastSumData=null;
+function rebuildTableCols(){if(_lastSumData)renderSumTable(_lastSumData);}
+function renderSumTable(allRes){
+  _lastSumData=allRes;
+  const showUmap=document.getElementById('col_umap').checked;
+  let hdrs=['Gene','Cell ID','Expression','Cell Type','Genotype','Sample'];
+  if(showUmap) hdrs.push('UMAP_1','UMAP_2');
+  document.getElementById('sum-thead').innerHTML='<tr>'+hdrs.map(h=>`<th>${h}</th>`).join('')+'</tr>';
+  const rows=[];
+  allRes.forEach(res=>{
+    const maxE=Math.max(...res.data.map(d=>d.expr),0.001);
+    res.data.forEach(d=>rows.push({gene:res.gene,maxE,...d}));
+  });
+  const tbody=document.getElementById('sum-tbody');
+  if(!rows.length){tbody.innerHTML=`<tr><td colspan="${hdrs.length}" style="padding:20px;color:#aab0c4;font-style:italic">No results.</td></tr>`;return;}
+  tbody.innerHTML=rows.map(d=>{
+    const cls=d.expr===0?'expr-zero':d.expr>d.maxE*0.75?'expr-high':'';
+    let cells=`<td><strong>${d.gene}</strong></td><td>${d.cell_id||'—'}</td><td class="${cls}">${d.expr.toFixed(4)}</td><td>${d.cell_type||'—'}</td><td>${d.genotype||'—'}</td><td>${d.dmm_id||'—'}</td>`;
+    if(showUmap) cells+=`<td>${d.umap1!=null?d.umap1.toFixed(4):'—'}</td><td>${d.umap2!=null?d.umap2.toFixed(4):'—'}</td>`;
+    return`<tr>${cells}</tr>`;
+  }).join('');
+}
+async function runSummary(){
+  setStatus('Loading table data…');
+  showErr('sum-err','');
+  document.getElementById('btn-download-csv').disabled=true;
+  const genes=sumGenes.length?sumGenes:['APOE'];
+  const genotype=msGetChecked('ms-sum-geno');
+  const ctChecked=msGetChecked('ms-sum-ct');
+  const sampChecked=msGetChecked('ms-sum-samp');
+  const ct  = ctChecked.length===1 ? ctChecked[0] : 'all';
+  const samp= sampChecked.length===1 ? sampChecked[0] : 'all';
+  const perGene=parseInt(document.getElementById('sum_limit').value||'200');
+  const limitEach=Math.max(10,Math.floor(perGene/genes.length));
+  try{
+    const results=await Promise.all(genes.map(gene=>{
+      const fd=new FormData();
+      fd.append('gene',gene);
+      genotype.forEach(g=>fd.append('genotype',g));
+      fd.append('cell_type',ct);
+      fd.append('sample',samp);
+      fd.append('min_expr',document.getElementById('sum_min_expr').value||'0');
+      fd.append('limit',limitEach);
+      return postFD(SUMMARY_URL,fd);
+    }));
+    const good=results.filter(r=>!r.error&&r.data);
+    if(!good.length){showErr('sum-err','No data returned.');setStatus('Error.');return;}
+    const total=good.reduce((s,r)=>s+r.data.length,0);
+    document.getElementById('sum-title').textContent=`Expression — ${genes.join(' · ')}`;
+    document.getElementById('sum-sub').textContent=`${total.toLocaleString()} rows`;
+    renderSumTable(good);
+    if(total) document.getElementById('btn-download-csv').disabled=false;
+    setStatus(`Loaded ${total.toLocaleString()} rows.`);
+  }catch(err){showErr('sum-err',err.message);setStatus('Error.');}
+}
+function downloadTableCSV(){
+  const t=document.getElementById('sum-table');
+  const rows=[];
+  rows.push([...t.querySelectorAll('thead th')].map(th=>`"${th.textContent.trim()}"`).join(','));
+  t.querySelectorAll('tbody tr').forEach(tr=>{
+    const cells=[...tr.querySelectorAll('td')].map(td=>`"${td.textContent.trim()}"`);
+    if(cells.length>1) rows.push(cells.join(','));
+  });
+  const blob=new Blob([rows.join('\n')],{type:'text/csv'});
+  const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(blob),download:`expression_${new Date().toISOString().slice(0,10)}.csv`});
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setStatus('CSV downloaded.');
+}
+let _lastCPData=null;
+async function runCellPropTable(){
+  setStatus('Loading proportion data…');
+  showErr('cp-err','');
+  document.getElementById('btn-download-cp').disabled=true;
+  const fd=new FormData();
+  msGetChecked('ms-cp-geno').forEach(g=>fd.append('genotype',g));
+  const ctChecked=msGetChecked('ms-cp-ct');
+  fd.append('cell_type',ctChecked.length===1?ctChecked[0]:'all');
+  msGetChecked('ms-cp-samp').forEach(s=>fd.append('sample',s));
+  try{
+    const res=await postFD(CELLPROP_URL,fd);
+    if(res.error){showErr('cp-err',res.error);setStatus('Error.');return;}
+    _lastCPData=res.data;
+    document.getElementById('cp-sub').textContent=`${res.data.length.toLocaleString()} rows`;
+    document.getElementById('cp-tbody').innerHTML=res.data.map(d=>`
+      <tr><td>${d.dmm_ID||'—'}</td><td>${d.APOE_Genotype||'—'}</td><td>${d.Final_Cell_Type||'—'}</td>
+      <td>${d.n||0}</td><td>${d.prop!=null?d.prop.toFixed(4):'—'}</td></tr>`).join('');
+    document.getElementById('btn-download-cp').disabled=false;
+    setStatus(`Loaded ${res.data.length.toLocaleString()} rows.`);
+  }catch(err){showErr('cp-err',err.message);setStatus('Error.');}
+}
+function downloadCPTableCSV(){
+  if(!_lastCPData) return;
+  const hdrs=['"Sample"','"Genotype"','"Cell Type"','"n"','"Proportion"'];
+  const rows=[hdrs.join(',')];
+  _lastCPData.forEach(d=>rows.push([d.dmm_ID,d.APOE_Genotype,d.Final_Cell_Type,d.n,d.prop!=null?d.prop.toFixed(6):''].map(v=>`"${v||''}"`).join(',')));
+  const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([rows.join('\n')],{type:'text/csv'})),download:`cell_proportion_${new Date().toISOString().slice(0,10)}.csv`});
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setStatus('Proportion CSV downloaded.');
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+window.addEventListener('load',()=>{
+  initAC('umap_gene_input','umap_gene_drop','umap_gene_val');
+  initSumAC();
+  renderSumTags();
+  initMgAC();
+  renderMgTags();
+  updateCompGrid();
+
+  showTab('explanation', document.querySelector('.tab-btn'));
+});
+</script>
+</body>
+</html>
